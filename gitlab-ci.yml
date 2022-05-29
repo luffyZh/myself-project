@@ -1,0 +1,65 @@
+### Gitlab CI/CD 配置
+
+```xml
+# 依赖镜像
+image: harbor-registry.inner.youdao.com/devops/node-for-ead:20200421-2
+services:
+  - name: harbor-registry.inner.youdao.com/devops/docker:18.03-dind
+    alias: docker
+
+# 定义阶段 stages
+stages:
+  - prebuild
+  - build
+  - docker-build
+  - deploy
+  - notify
+
+# 定义 job - prebuild，测试同学测试提测分支时手动点击才部署到测试机上，避免多余的部署浪费资源
+job:prebuild:
+  stage: prebuild
+  except: 
+    - master
+    - web
+  script:
+    - echo "使用版本：${CI_COMMIT_REF_NAME}:${CI_COMMIT_SHA} 进行测试"
+  allow_failure: false
+  when: manual
+
+# 定义 job，生产环境 build 项目
+job:build-prod:
+  tags:
+    - k8s
+  stage: build
+  only:
+    - master
+  except:
+    - web
+
+# 定义 job，生产环境上线
+job:deploy-prod:
+  image: harbor-registry.inner.youdao.com/devops/docker:18.06-ydci
+  stage: deploy
+  script:
+  <<: *deploy_prod_def
+  tags:
+    - k8s
+  only:
+    - master
+  except:
+    - web
+
+# 定义 job，上线成功通知
+job:notify_success:
+  stage: notify
+  tags:
+    - k8s
+  image: harbor-registry.inner.youdao.com/devops/docker:18.06-ydci
+  variables:
+  	MSG: "CI PIPELINE SUCCESS"
+  script:
+  	<<: *notify_def
+```
+
+
+
